@@ -49,8 +49,8 @@ VERSION = "v1.1"
 # ── Auto-updater config ───────────────────────────────────────────────────────
 # Set these to your GitHub repo's raw file URLs after first publish.
 # Replace YOUR_USERNAME and YOUR_REPO with your actual GitHub details.
-GITHUB_VERSION_URL = "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/version.txt"
-GITHUB_EXE_URL     = "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/SFEPM_Takeoff_Wizard.exe"
+GITHUB_VERSION_URL = "https://raw.githubusercontent.com/thecampbellm2/sfepm-wizard/main/version.txt"
+GITHUB_EXE_URL     = "https://raw.githubusercontent.com/thecampbellm2/sfepm-wizard/main/SFEPM_Takeoff_Wizard.exe"
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Map Windows usernames to display names for "Prepared by" field
