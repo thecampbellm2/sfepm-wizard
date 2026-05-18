@@ -1,0 +1,3 @@
+- Brickwork tab: Opening Count and Opening Width (LM) columns added next to Deductions M2
+- Blockwork tab: Same opening columns added
+- George Summary: Total Openings and Total Opening Width (LM) per brick/block type
