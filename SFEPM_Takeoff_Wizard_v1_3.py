@@ -1,8 +1,14 @@
 """
-SFEPM Takeoff Wizard  v1.2
+SFEPM Takeoff Wizard  v1.3
 ==================
 Double-click to run. Requires Python 3.8+ with openpyxl.
 If openpyxl is not installed, run:  pip install openpyxl
+
+Changes in v1.3:
+  - Save dialog pre-fills to H:\\My Drive\\Jobs\\[YYYY]\\[MM MMM]\\[Job Name]\\
+    Folders are created automatically if they don't exist.
+    Falls back to standard folder picker if H: drive is unavailable.
+    Invalid Windows filename characters stripped from job name in path.
 
 Changes in v1.2:
   - Brickwork tab: Opening Count and Opening Width (LM) columns added
@@ -53,14 +59,14 @@ except ImportError:
 # ══════════════════════════════════════════════════════════════════════════════
 #  VERSION & USER LOOKUP
 # ══════════════════════════════════════════════════════════════════════════════
-VERSION = "v1.2"
+VERSION = "v1.3"
 
 # ── Auto-updater config ───────────────────────────────────────────────────────
 # Set these to your GitHub repo's raw file URLs after first publish.
 # Replace YOUR_USERNAME and YOUR_REPO with your actual GitHub details.
 GITHUB_VERSION_URL   = "https://raw.githubusercontent.com/thecampbellm2/sfepm-wizard/main/version.txt"
 GITHUB_EXE_URL       = "https://raw.githubusercontent.com/thecampbellm2/sfepm-wizard/main/SFEPM_Takeoff_Wizard.exe"
-GITHUB_CHANGELOG_URL = "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/changelog.txt"
+GITHUB_CHANGELOG_URL = "https://raw.githubusercontent.com/thecampbellm2/sfepm-wizard/main/changelog.txt"
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Map Windows usernames to display names for "Prepared by" field
@@ -161,9 +167,6 @@ def check_for_updates():
 
     if not getattr(sys, "frozen", False):
         return   # Running as .py script — skip version check
-
-    if "YOUR_USERNAME" in GITHUB_VERSION_URL:
-        return   # Placeholder URLs not yet configured
 
     import urllib.request
     import threading
@@ -1330,6 +1333,25 @@ def build_excel(config):
     return save_path
 
 
+def build_dynamic_save_path(job_name):
+    """
+    Construct H:\\My Drive\\Jobs\\[YYYY]\\[MM MMM]\\[job_name]\\
+    Strips invalid Windows filename characters from job_name.
+    Returns the full path string if H:\\ drive is available, else None.
+    """
+    if not os.path.isdir("H:\\"):
+        return None
+    import re
+    from datetime import datetime as _dt
+    safe_name = re.sub(r'[\\/:*?"<>|]', "", job_name).strip()
+    if not safe_name:
+        return None
+    now   = _dt.now()
+    year  = now.strftime("%Y")
+    month = now.strftime("%m %B")   # e.g. "05 May"
+    return os.path.join("H:\\", "My Drive", "Jobs", year, month, safe_name)
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 #  THEME  —  single unified professional theme for Sydney Fitout
 #  Palette: near-black navy / off-white / warm slate / amber gold accent
@@ -1987,6 +2009,7 @@ class StepJobName(BaseStep):
                    cfg_saved if cfg_saved and os.path.isdir(cfg_saved)
                    else os.path.join(os.path.expanduser("~"), "Downloads"))
         self.folder_var = tk.StringVar(value=default)
+        self._folder_manually_set = False   # flips True if user clicks Browse
         fe = self._make_entry(folder_row, font_size=10)
         fe.config(textvariable=self.folder_var)
         fe.pack(side="left", fill="x", expand=True, ipady=5)
@@ -1996,6 +2019,7 @@ class StepJobName(BaseStep):
             d = filedialog.askdirectory(initialdir=self.folder_var.get())
             if d:
                 self.folder_var.set(d)
+                self._folder_manually_set = True
                 self._refresh()
 
         tk.Button(folder_row, text="Browse…", font=("Arial", 10),
@@ -2024,6 +2048,11 @@ class StepJobName(BaseStep):
             text=f"→  Will save as:  {job} - {typ} Takeoff.xlsx" if job
             else "→  Enter a job name above"
         )
+        # Auto-update save path from job name unless user has manually browsed
+        if not self._folder_manually_set and job:
+            dynamic = build_dynamic_save_path(job)
+            if dynamic:
+                self.folder_var.set(dynamic)
         cfg  = self.config_data
         sc   = cfg.get("scope", "—").capitalize()
         bt   = ", ".join(cfg.get("brick_types", [])) or "—"

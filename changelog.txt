@@ -1,3 +1,4 @@
-- Brickwork tab: Opening Count and Opening Width (LM) columns added next to Deductions M2
-- Blockwork tab: Same opening columns added
-- George Summary: Total Openings and Total Opening Width (LM) per brick/block type
+- Save dialog now pre-fills to H:\My Drive\Jobs\[YYYY]\[MM MMM]\[Job Name]\ based on job name and current date
+- Folders are created automatically if they don't exist
+- Falls back to standard folder picker silently if H: drive is unavailable
+- Invalid Windows filename characters stripped from job name when building path
