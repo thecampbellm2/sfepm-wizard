@@ -1,8 +1,13 @@
 """
-NEPM Takeoff Wizard  v1.4
+NEPM Takeoff Wizard  v1.5
 ==================
 Double-click to run. Requires Python 3.8+ with openpyxl and Pillow.
 If missing, run:  pip install openpyxl pillow
+
+Changes in v1.5:
+  - Monochrome (black/white/grey) colour palette throughout wizard and spreadsheet
+  - Spreadsheet title block redesigned: tall mega-header with large logo + job name
+  - Wizard logo enlarged to fill header band
 
 Changes in v1.4:
   - Rebranded: Sydney Fitout Estimation & Project Management →
@@ -65,7 +70,7 @@ except ImportError:
 # ══════════════════════════════════════════════════════════════════════════════
 #  VERSION & USER LOOKUP
 # ══════════════════════════════════════════════════════════════════════════════
-VERSION = "v1.4"
+VERSION = "v1.5"
 
 # ── Auto-updater config ───────────────────────────────────────────────────────
 # Set these to your GitHub repo's raw file URLs after first publish.
@@ -303,10 +308,10 @@ def check_for_updates():
 # ══════════════════════════════════════════════════════════════════════════════
 FONT_NAME = "Aptos"
 
-C_DARK_BLUE  = "1F3864"
-C_MID_BLUE   = "2E75B6"
-C_LIGHT_BLUE = "D6E4F0"
-C_AMBER      = "F4B942"
+C_DARK_BLUE  = "0D0D0D"
+C_MID_BLUE   = "3D3D3D"
+C_LIGHT_BLUE = "DCDCDC"
+C_AMBER      = "888888"
 C_WHITE      = "FFFFFF"
 C_LT_GREY    = "F2F2F2"
 C_DARK_GREY  = "595959"
@@ -357,124 +362,76 @@ def set_col_widths(ws, widths):
 
 def title_block(ws, job_name, sheet_label, n_cols=16):
     """
-    Branded title block:
-      Row 1 — dark bar: logo mark left  |  sheet label centre  |  business name right
-      Row 2 — accent bar: job name
-      Row 3 — meta bar: date left  |  prepared by right
-      Rows 4-5 — spacers
+    Branded title block  (NEPM monochrome theme, v1.5):
+      Row 1 — mega header (height 130pt): NEPM badge logo (A1:B1)
+               job name text (C1:last, large white, centred)
+      Row 2 — meta bar: date (left)  |  prepared by (right)
+      Rows 3–5 — spacers (5pt each)
+    sheet_label is accepted for API compatibility but not displayed;
+    the tab name identifies the sheet type.
+    Data always starts at row 7 — freeze_panes and DATA_START unchanged.
     """
-    last = get_column_letter(n_cols)
-    mid  = get_column_letter(max(1, n_cols // 2))
-    nxt  = get_column_letter(max(2, n_cols // 2 + 1))
-    logo_cols = 2  # columns reserved for logo mark
+    from datetime import date as _date
 
-    # ── Row 1 — primary header bar ──────────────────────────────────────────
-    ws.row_dimensions[1].height = 52
-    wide = n_cols >= 8   # wide enough for split layout with business name
+    last     = get_column_letter(n_cols)
+    mid      = get_column_letter(max(1, n_cols // 2))
+    nxt      = get_column_letter(max(2, n_cols // 2 + 1))
+    LOGO_COLS = min(2, n_cols - 1)   # cols reserved for logo (A:B, or just A if narrow)
 
-    # Logo mark cell (cols 1-2 if wide, else col 1 only)
-    logo_cols_actual = min(logo_cols, n_cols - 1) if wide else 1
-    logo_col = get_column_letter(logo_cols_actual)
-    ws.merge_cells(f"A1:{logo_col}1")
-    c = ws["A1"]
-    c.value     = ""
-    c.fill      = fill("0D1B2A")
-    c.alignment = align(h="center")
-    # Embed NEPM badge logo — requires Pillow; fails silently without it
+    # ── Row 1 — mega header ───────────────────────────────────────────────────
+    ws.row_dimensions[1].height = 130
+
+    # Logo area
+    logo_end = get_column_letter(LOGO_COLS)
+    ws.merge_cells(f"A1:{logo_end}1")
+    lc = ws["A1"]
+    lc.value     = ""
+    lc.fill      = fill("0D0D0D")
+    lc.alignment = align(h="center", v="center")
     try:
         from openpyxl.drawing.image import Image as _XLImg
         import io as _io
-        _raw = base64.b64decode(LOGO_B64)
+        _raw    = base64.b64decode(LOGO_B64)
         _xl_img = _XLImg(_io.BytesIO(_raw))
-        _xl_img.width  = 52
-        _xl_img.height = 52
+        _xl_img.width  = 115
+        _xl_img.height = 115
         ws.add_image(_xl_img, "A1")
     except Exception:
-        c.value = "N"
-        c.font  = Font(name=FONT_NAME, bold=True, size=16, color=C_AMBER)
+        lc.value = "N"
+        lc.font  = Font(name=FONT_NAME, bold=True, size=28, color=C_WHITE)
 
-    if wide:
-        # Sheet label (centre span, leaving 4 cols right for business name)
-        mid_start = get_column_letter(logo_cols_actual + 1)
-        mid_end   = get_column_letter(n_cols - 4)
-        ws.merge_cells(f"{mid_start}1:{mid_end}1")
-        c = ws[f"{mid_start}1"]
-        c.value     = sheet_label
-        c.font      = Font(name=FONT_NAME, bold=True, size=16, color=C_WHITE)
-        c.fill      = fill(C_DARK_BLUE)
-        c.alignment = align(h="center")
-
-        # Business name (right 4 cols)
-        biz_start = get_column_letter(n_cols - 3)
-        ws.merge_cells(f"{biz_start}1:{last}1")
-        c = ws[f"{biz_start}1"]
-        c.value     = "NATIONAL ESTIMATION"
-        c.font      = Font(name=FONT_NAME, bold=True, size=11, color=C_AMBER)
-        c.fill      = fill(C_DARK_BLUE)
-        c.alignment = align(h="right")
+    # Job name area
+    if n_cols > LOGO_COLS:
+        job_start = get_column_letter(LOGO_COLS + 1)
+        ws.merge_cells(f"{job_start}1:{last}1")
+        jc = ws[f"{job_start}1"]
     else:
-        # Narrow sheet: sheet label fills remaining cols
-        if logo_cols_actual < n_cols:
-            label_start = get_column_letter(logo_cols_actual + 1)
-            ws.merge_cells(f"{label_start}1:{last}1")
-            c = ws[f"{label_start}1"]
-        else:
-            c = ws["A1"]
-        c.value     = sheet_label
-        c.font      = Font(name=FONT_NAME, bold=True, size=13, color=C_WHITE)
-        c.fill      = fill(C_DARK_BLUE)
-        c.alignment = align(h="center")
+        jc = lc   # fallback for very narrow sheets
+    jc.value     = job_name
+    jc.font      = Font(name=FONT_NAME, bold=True, size=20, color=C_WHITE)
+    jc.fill      = fill("0D0D0D")
+    jc.alignment = align(h="center", v="center", wrap=False)
 
-    # ── Row 2 — job name / accent bar ───────────────────────────────────────
-    ws.row_dimensions[2].height = 28
-
-    if wide:
-        # Left portion: job name
-        tag_end = get_column_letter(n_cols - 4)
-        ws.merge_cells(f"A2:{tag_end}2")
-        c = ws["A2"]
-        c.value     = job_name
-        c.font      = Font(name=FONT_NAME, bold=True, size=13, color=C_WHITE)
-        c.fill      = fill("0D1B2A")
-        c.alignment = Alignment(horizontal="left", vertical="center",
-                                indent=2, wrap_text=False)
-        # Right portion: tagline
-        tag_start = get_column_letter(n_cols - 3)
-        ws.merge_cells(f"{tag_start}2:{last}2")
-        c = ws[f"{tag_start}2"]
-        c.value     = "AND PROJECT MANAGEMENT"
-        c.font      = Font(name=FONT_NAME, size=7, color="8899AA", italic=True)
-        c.fill      = fill("0D1B2A")
-        c.alignment = align(h="right")
-    else:
-        # Narrow: full-width job name
-        ws.merge_cells(f"A2:{last}2")
-        c = ws["A2"]
-        c.value     = job_name
-        c.font      = Font(name=FONT_NAME, bold=True, size=11, color=C_WHITE)
-        c.fill      = fill("0D1B2A")
-        c.alignment = Alignment(horizontal="left", vertical="center",
-                                indent=1, wrap_text=False)
-
-    # ── Row 3 — meta bar ────────────────────────────────────────────────────
-    ws.row_dimensions[3].height = 18
-    from datetime import date as _date
-    ws.merge_cells(f"A3:{mid}3")
-    c = ws["A3"]
+    # ── Row 2 — meta bar ──────────────────────────────────────────────────────
+    ws.row_dimensions[2].height = 18
+    ws.merge_cells(f"A2:{mid}2")
+    c = ws["A2"]
     c.value     = f"Date:  {_date.today().strftime('%d/%m/%Y')}"
     c.font      = xfont(italic=True, sz=9, c=C_DARK_GREY)
     c.fill      = fill(C_LT_GREY)
     c.alignment = align(h="left")
 
-    ws.merge_cells(f"{nxt}3:{last}3")
-    c = ws[f"{nxt}3"]
-    _name = get_display_name()
-    c.value     = f"Prepared by:  {_name}" if _name else "Prepared by:  _________________________"
+    ws.merge_cells(f"{nxt}2:{last}2")
+    c = ws[f"{nxt}2"]
+    _name   = get_display_name()
+    c.value = (f"Prepared by:  {_name}" if _name
+               else "Prepared by:  _________________________")
     c.font      = xfont(italic=True, sz=9, c=C_DARK_GREY)
     c.fill      = fill(C_LT_GREY)
     c.alignment = align(h="right")
 
-    # ── Spacers ──────────────────────────────────────────────────────────────
+    # ── Rows 3–5 — spacers ────────────────────────────────────────────────────
+    ws.row_dimensions[3].height = 5
     ws.row_dimensions[4].height = 5
     ws.row_dimensions[5].height = 5
 
@@ -603,7 +560,7 @@ def build_brickwork(wb, job_name, brick_types, brick_rates_rows):
                      10: "#,##0", 11: "#,##0", 13: "$#,##0.00"}.items():
         cl = get_column_letter(col)
         c = ws.cell(T, col, f"=SUM({cl}{DATA_START}:{cl}{T-1})")
-        c.font = xfont(bold=True, c=C_AMBER)
+        c.font = xfont(bold=True, c=C_WHITE)
         c.fill = fill(C_DARK_BLUE)
         c.number_format = fmt
 
@@ -748,7 +705,7 @@ def build_blockwork(wb, job_name, block_data, block_rates_rows):
     for col, fmt in sums.items():
         cl = get_column_letter(col)
         c = ws.cell(T, col, f"=SUM({cl}{DATA_START}:{cl}{T-1})")
-        c.font = xfont(bold=True, c=C_AMBER)
+        c.font = xfont(bold=True, c=C_WHITE)
         c.fill = fill(C_DARK_BLUE)
         c.number_format = fmt
 
@@ -825,7 +782,7 @@ def build_demo(wb, job_name):
     for col, fmt in {6: "0.00", 9: "$#,##0.00"}.items():
         cl = get_column_letter(col)
         c = ws.cell(T, col, f"=SUM({cl}{DATA_START}:{cl}{T-1})")
-        c.font = xfont(bold=True, c=C_AMBER)
+        c.font = xfont(bold=True, c=C_WHITE)
         c.fill = fill(C_DARK_BLUE)
         c.number_format = fmt
 
@@ -954,7 +911,7 @@ def build_george_summary(wb, job_name, scope, brick_types, block_types):
     if scope in ("blockwork", "both"):
         ws.merge_cells(f"A{r}:N{r}")
         c = ws.cell(r, 1, "BLOCKWORK")
-        c.font = Font(name=FONT_NAME, bold=True, size=13, color=C_AMBER)
+        c.font = Font(name=FONT_NAME, bold=True, size=13, color=C_WHITE)
         c.fill = fill(C_DARK_BLUE); c.alignment = align()
         ws.row_dimensions[r].height = 26; r += 1
 
@@ -1022,10 +979,10 @@ def build_george_summary(wb, job_name, scope, brick_types, block_types):
         # ── Blockwork subtotal row ─────────────────────────────────────────
         ws.merge_cells(f"A{r}:H{r}")
         c = ws.cell(r, 1, "Blockwork Subtotal")
-        c.font = xfont(bold=True, c=C_AMBER); c.fill = fill(C_DARK_BLUE)
+        c.font = xfont(bold=True, c=C_WHITE); c.fill = fill(C_DARK_BLUE)
         c.alignment = align(h="right")
         c = ws.cell(r, 9, f"=SUM(I{blk_sub_start}:I{blk_sub_end})")
-        c.font = xfont(bold=True, c=C_AMBER); c.fill = fill(C_DARK_BLUE)
+        c.font = xfont(bold=True, c=C_WHITE); c.fill = fill(C_DARK_BLUE)
         c.number_format = "$#,##0.00"
         for ci in range(2, 15): ws.cell(r, ci).fill = fill(C_DARK_BLUE)
         ws.row_dimensions[r].height = 22
@@ -1089,10 +1046,10 @@ def build_george_summary(wb, job_name, scope, brick_types, block_types):
 
     ws.merge_cells(f"A{r}:{get_column_letter(label_end)}{r}")
     c = ws.cell(r, 1, "GRAND TOTAL  (excl. GST)")
-    c.font = Font(name=FONT_NAME, bold=True, size=12, color=C_AMBER)
+    c.font = Font(name=FONT_NAME, bold=True, size=12, color=C_WHITE)
     c.fill = fill(C_DARK_BLUE); c.alignment = align(h="right")
     c = ws.cell(r, grand_col, grand)
-    c.font = Font(name=FONT_NAME, bold=True, size=13, color=C_AMBER)
+    c.font = Font(name=FONT_NAME, bold=True, size=13, color=C_WHITE)
     c.fill = fill(C_DARK_BLUE); c.number_format = "$#,##0.00"
     for ci in range(1, 15): ws.cell(r, ci).fill = fill(C_DARK_BLUE)
     ws.row_dimensions[r].height = 32
@@ -1385,37 +1342,37 @@ def build_dynamic_save_path(job_name):
 # Single unified theme — no more masonry/demo split
 T = {
     # ── chrome / structural ─────────────────────────────────────
-    "bg_dark":         "#0D1B2A",   # near-black navy — header, nav
-    "bg_mid":          "#1A2E44",   # deep navy — secondary panels
-    "bg_panel":        "#F7F8FA",   # off-white — content area
-    "bg_card":         "#ECEEF2",   # cool light grey — summary cards
-    "sep":             "#C8A951",   # warm gold — rule lines
+    "bg_dark":         "#0D0D0D",   # near-black — header, nav
+    "bg_mid":          "#1C1C1C",   # dark grey — secondary panels
+    "bg_panel":        "#F5F5F5",   # off-white — content area
+    "bg_card":         "#E8E8E8",   # light grey — summary cards
+    "sep":             "#FFFFFF",   # white — rule lines (was gold)
     # ── text ────────────────────────────────────────────────────
-    "text_light":      "#F7F8FA",   # near-white — on dark bg
-    "text_dark":       "#0D1B2A",   # navy — on light bg
-    "text_muted":      "#7A8A99",   # slate — secondary text
-    "text_accent":     "#C8A951",   # gold — logo, highlights
+    "text_light":      "#F5F5F5",   # near-white — on dark bg
+    "text_dark":       "#0D0D0D",   # near-black — on light bg
+    "text_muted":      "#888888",   # mid grey — secondary text
+    "text_accent":     "#FFFFFF",   # white — logo mark, highlights (was gold)
     # ── interactive ─────────────────────────────────────────────
-    "radio_bg":        "#ECEEF2",
-    "radio_select":    "#C8A951",
-    "entry_hl":        "#C8A951",
-    "entry_hl_bg":     "#C8D0DA",
+    "radio_bg":        "#E8E8E8",
+    "radio_select":    "#0D0D0D",   # black selection dot (was gold)
+    "entry_hl":        "#0D0D0D",   # black highlight border (was gold)
+    "entry_hl_bg":     "#C0C0C0",
     # ── buttons ─────────────────────────────────────────────────
-    "btn_back_bg":     "#1A2E44",
-    "btn_back_fg":     "#7A8A99",
-    "btn_next_bg":     "#1A2E44",
-    "btn_next_fg":     "#F7F8FA",
-    "btn_create_bg":   "#C8A951",
-    "btn_create_fg":   "#0D1B2A",
+    "btn_back_bg":     "#1C1C1C",
+    "btn_back_fg":     "#888888",
+    "btn_next_bg":     "#1C1C1C",
+    "btn_next_fg":     "#F5F5F5",
+    "btn_create_bg":   "#FFFFFF",   # white create button (was gold)
+    "btn_create_fg":   "#0D0D0D",   # black text on white
     # ── misc ────────────────────────────────────────────────────
-    "progress_bar":    "#C8A951",
-    "content_bg":      "#F7F8FA",
-    "summary_bg":      "#ECEEF2",
-    "step_title_fg":   "#0D1B2A",
-    "subtitle_fg":     "#7A8A99",
-    "header_title_fg": "#C8A951",
-    "bg_step_tag_bg":  "#C8A951",
-    "bg_step_tag_fg":  "#0D1B2A",
+    "progress_bar":    "#FFFFFF",   # white progress bar (was gold)
+    "content_bg":      "#F5F5F5",
+    "summary_bg":      "#E8E8E8",
+    "step_title_fg":   "#0D0D0D",
+    "subtitle_fg":     "#888888",
+    "header_title_fg": "#FFFFFF",   # white (was gold)
+    "bg_step_tag_bg":  "#0D0D0D",   # black pill (was gold)
+    "bg_step_tag_fg":  "#FFFFFF",
 }
 
 # Keep THEMES dict for compatibility — all keys point to same theme
@@ -1457,16 +1414,16 @@ class WizardApp(tk.Tk):
             from PIL import Image as _PILImage, ImageTk as _ImageTk
             import io as _io
             _raw = base64.b64decode(LOGO_B64)
-            _pil = _PILImage.open(_io.BytesIO(_raw)).resize((56, 56), _PILImage.LANCZOS)
+            _pil = _PILImage.open(_io.BytesIO(_raw)).resize((80, 80), _PILImage.LANCZOS)
             self._logo_img = _ImageTk.PhotoImage(_pil)
             tk.Label(self.hdr_frame, image=self._logo_img,
                      bg=t["bg_dark"], bd=0
-                     ).pack(side="left", padx=(20, 16), pady=8)
+                     ).pack(side="left", padx=(16, 14), pady=4)
         except Exception:
-            logo_box = tk.Frame(self.hdr_frame, bg=t["bg_mid"], width=56, height=56)
-            logo_box.pack(side="left", padx=(20, 16), pady=16)
+            logo_box = tk.Frame(self.hdr_frame, bg=t["bg_mid"], width=80, height=80)
+            logo_box.pack(side="left", padx=(16, 14), pady=4)
             logo_box.pack_propagate(False)
-            tk.Label(logo_box, text="N", font=("Georgia", 20, "bold"),
+            tk.Label(logo_box, text="N", font=("Georgia", 26, "bold"),
                      fg=t["text_accent"], bg=t["bg_mid"]
                      ).place(relx=0.5, rely=0.5, anchor="center")
 
