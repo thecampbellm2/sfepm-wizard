@@ -1,10 +1,10 @@
 @echo off
-title SFEPM Takeoff Wizard — Build & Deploy
+title NEPM Takeoff Wizard — Build & Deploy
 setlocal enabledelayedexpansion
 
 echo.
 echo  ╔══════════════════════════════════════════════════╗
-echo  ║   SFEPM Takeoff Wizard — Build ^& Deploy          ║
+echo  ║   NEPM Takeoff Wizard — Build ^& Deploy           ║
 echo  ╚══════════════════════════════════════════════════╝
 echo.
 
@@ -23,11 +23,11 @@ echo.
 
 :: ── Auto-detect latest wizard script ─────────────────────────────────────────
 set SCRIPT=
-for /f "delims=" %%i in ('dir /b /o:-n "SFEPM_Takeoff_Wizard_v*.py" 2^>nul') do (
+for /f "delims=" %%i in ('dir /b /o:-n "NEPM_Takeoff_Wizard_v*.py" 2^>nul') do (
     if not defined SCRIPT set SCRIPT=%%i
 )
 if not defined SCRIPT (
-    echo  ERROR: No SFEPM_Takeoff_Wizard_v*.py found in this folder.
+    echo  ERROR: No NEPM_Takeoff_Wizard_v*.py found in this folder.
     pause & exit /b 1
 )
 echo  Script found: %SCRIPT%
@@ -41,15 +41,15 @@ echo.
 :: ── Write version.txt ────────────────────────────────────────────────────────
 echo %VERSION%> version.txt
 
-:: ── Install compatible PyInstaller ───────────────────────────────────────────
-echo  Checking PyInstaller...
-%PYTHON% -m pip install "pyinstaller>=6.10" --upgrade --quiet
+:: ── Install dependencies ─────────────────────────────────────────────────────
+echo  Checking dependencies...
+%PYTHON% -m pip install "pyinstaller>=6.10" openpyxl pillow --upgrade --quiet
 
 :: ── Clean previous build ─────────────────────────────────────────────────────
 echo  Cleaning previous build...
-if exist "dist\SFEPM_Takeoff_Wizard.exe" del /f /q "dist\SFEPM_Takeoff_Wizard.exe"
+if exist "dist\NEPM_Takeoff_Wizard.exe" del /f /q "dist\NEPM_Takeoff_Wizard.exe"
 if exist "build" rmdir /s /q "build"
-if exist "SFEPM_Takeoff_Wizard.spec" del /f /q "SFEPM_Takeoff_Wizard.spec"
+if exist "NEPM_Takeoff_Wizard.spec" del /f /q "NEPM_Takeoff_Wizard.spec"
 
 :: ── Build ────────────────────────────────────────────────────────────────────
 echo  Building exe — this takes about 30 seconds...
@@ -57,15 +57,19 @@ echo.
 %PYTHON% -m PyInstaller ^
     --onefile ^
     --windowed ^
-    --name "SFEPM_Takeoff_Wizard" ^
+    --name "NEPM_Takeoff_Wizard" ^
     --hidden-import openpyxl ^
     --hidden-import openpyxl.styles ^
     --hidden-import openpyxl.utils ^
     --hidden-import openpyxl.worksheet.datavalidation ^
+    --hidden-import PIL ^
+    --hidden-import PIL.Image ^
+    --hidden-import PIL.ImageTk ^
     --collect-all tkinter ^
+    --collect-all PIL ^
     %SCRIPT%
 
-if not exist "dist\SFEPM_Takeoff_Wizard.exe" (
+if not exist "dist\NEPM_Takeoff_Wizard.exe" (
     echo.
     echo  BUILD FAILED — check the output above for errors.
     pause & exit /b 1

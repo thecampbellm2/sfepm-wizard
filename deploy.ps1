@@ -1,4 +1,4 @@
-# SFEPM Takeoff Wizard - GitHub Deploy Script
+# NEPM Takeoff Wizard - GitHub Deploy Script
 # Called automatically by build.bat after a successful build.
 # Requires github_token.txt in the same folder.
 
@@ -27,7 +27,7 @@ try {
 
     # Clone repo to temp folder
     $repoUrl = "https://$token@github.com/thecampbellm2/sfepm-wizard.git"
-    $tempDir = Join-Path $env:TEMP "sfepm_deploy_$(Get-Random)"
+    $tempDir = Join-Path $env:TEMP "nepm_deploy_$(Get-Random)"
 
     Write-Host "  Cloning repo..."
     git clone $repoUrl $tempDir --quiet 2>&1 | Out-Null
@@ -35,7 +35,7 @@ try {
 
     # Copy new files into cloned repo
     Write-Host "  Copying files..."
-    Copy-Item (Join-Path $PSScriptRoot "dist\SFEPM_Takeoff_Wizard.exe") (Join-Path $tempDir "SFEPM_Takeoff_Wizard.exe") -Force
+    Copy-Item (Join-Path $PSScriptRoot "dist\NEPM_Takeoff_Wizard.exe") (Join-Path $tempDir "NEPM_Takeoff_Wizard.exe") -Force
     Copy-Item (Join-Path $PSScriptRoot $Script)         (Join-Path $tempDir $Script)         -Force
     Copy-Item (Join-Path $PSScriptRoot "version.txt")   (Join-Path $tempDir "version.txt")   -Force
     Copy-Item (Join-Path $PSScriptRoot "changelog.txt") (Join-Path $tempDir "changelog.txt") -Force
@@ -43,15 +43,18 @@ try {
     Copy-Item (Join-Path $PSScriptRoot "deploy.ps1")    (Join-Path $tempDir "deploy.ps1")    -Force
 
     # Remove old script versions from repo
-    Get-ChildItem (Join-Path $tempDir "SFEPM_Takeoff_Wizard_v*.py") |
+    Get-ChildItem (Join-Path $tempDir "NEPM_Takeoff_Wizard_v*.py") |
         Where-Object { $_.Name -ne $Script } |
+        Remove-Item -Force
+    # Also clean up any old SFEPM-named scripts if present
+    Get-ChildItem (Join-Path $tempDir "SFEPM_Takeoff_Wizard_v*.py") -ErrorAction SilentlyContinue |
         Remove-Item -Force
 
     # Commit and push
     Write-Host "  Committing and pushing v$Version..."
     Set-Location $tempDir
-    git config user.email "build@sfepm.local"
-    git config user.name  "SFEPM Build"
+    git config user.email "build@nepm.local"
+    git config user.name  "NEPM Build"
     git add -A
     git commit -m "Release v$Version" --quiet
     git push origin main --quiet 2>&1 | Out-Null

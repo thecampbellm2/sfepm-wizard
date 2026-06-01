@@ -1,4 +1,3 @@
-- Save dialog now pre-fills to H:\My Drive\Jobs\[YYYY]\[MM MMM]\[Job Name]\ based on job name and current date
-- Folders are created automatically if they don't exist
-- Falls back to standard folder picker silently if H: drive is unavailable
-- Invalid Windows filename characters stripped from job name when building path
+- Rebranded to National Estimation & Project Management (NEPM)
+- NEPM circular badge logo now appears in wizard header and spreadsheet title block
+- All SFEPM references updated to NEPM throughout
