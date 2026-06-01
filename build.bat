@@ -8,13 +8,12 @@ echo  ║   NEPM Takeoff Wizard — Build ^& Deploy           ║
 echo  ╚══════════════════════════════════════════════════╝
 echo.
 
-:: ── Find Python ──────────────────────────────────────────────────────────────
+:: ── Find Python 3.12 (pinned — PyInstaller requires 3.12 for stable builds) ───
 set PYTHON=
-py --version > nul 2>&1
-if not errorlevel 1 ( set PYTHON=py & goto :found_python )
-python --version > nul 2>&1
-if not errorlevel 1 ( set PYTHON=python & goto :found_python )
-echo  ERROR: Python not found.
+py -3.12 --version > nul 2>&1
+if not errorlevel 1 ( set PYTHON=py -3.12 & goto :found_python )
+echo  ERROR: Python 3.12 not found. Install from python.org before building.
+echo  (3.13+ is not supported by PyInstaller for this project.)
 pause & exit /b 1
 
 :found_python
