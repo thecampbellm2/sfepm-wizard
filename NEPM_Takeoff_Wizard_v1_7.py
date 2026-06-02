@@ -1,8 +1,12 @@
 """
-NEPM Takeoff Wizard  v1.6
+NEPM Takeoff Wizard  v1.7
 ==================
 Double-click to run. Requires Python 3.8+ with openpyxl and Pillow.
 If missing, run:  pip install openpyxl pillow
+
+Changes in v1.7:
+  - Spreadsheet logo enlarged to 5.21 cm × 5.21 cm to fill the header row
+  - Row 1 height increased to match the larger logo
 
 Changes in v1.6:
   - Fixed: selected radio button now shows a visible white dot
@@ -74,7 +78,7 @@ except ImportError:
 # ══════════════════════════════════════════════════════════════════════════════
 #  VERSION & USER LOOKUP
 # ══════════════════════════════════════════════════════════════════════════════
-VERSION = "v1.6"
+VERSION = "v1.7"
 
 # ── Auto-updater config ───────────────────────────────────────────────────────
 # Set these to your GitHub repo's raw file URLs after first publish.
@@ -383,7 +387,7 @@ def title_block(ws, job_name, sheet_label, n_cols=16):
     LOGO_COLS = min(2, n_cols - 1)   # cols reserved for logo (A:B, or just A if narrow)
 
     # ── Row 1 — mega header ───────────────────────────────────────────────────
-    ws.row_dimensions[1].height = 130
+    ws.row_dimensions[1].height = 152
 
     # Logo area
     logo_end = get_column_letter(LOGO_COLS)
@@ -397,8 +401,8 @@ def title_block(ws, job_name, sheet_label, n_cols=16):
         import io as _io
         _raw    = base64.b64decode(LOGO_B64)
         _xl_img = _XLImg(_io.BytesIO(_raw))
-        _xl_img.width  = 115
-        _xl_img.height = 115
+        _xl_img.width  = 197
+        _xl_img.height = 197
         ws.add_image(_xl_img, "A1")
     except Exception:
         lc.value = "N"

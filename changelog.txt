@@ -1,1 +1,1 @@
-- Fixed: selected radio button option now shows a visible white dot — was invisible against the dark ring in v1.5
+- Spreadsheet logo enlarged to match preferred size (5.21 cm × 5.21 cm) — fills the header row properly
