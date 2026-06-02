@@ -1,8 +1,12 @@
 """
-NEPM Takeoff Wizard  v1.5
+NEPM Takeoff Wizard  v1.6
 ==================
 Double-click to run. Requires Python 3.8+ with openpyxl and Pillow.
 If missing, run:  pip install openpyxl pillow
+
+Changes in v1.6:
+  - Fixed: selected radio button now shows a visible white dot
+    (was invisible against the dark indicator ring in v1.5)
 
 Changes in v1.5:
   - Monochrome (black/white/grey) colour palette throughout wizard and spreadsheet
@@ -70,7 +74,7 @@ except ImportError:
 # ══════════════════════════════════════════════════════════════════════════════
 #  VERSION & USER LOOKUP
 # ══════════════════════════════════════════════════════════════════════════════
-VERSION = "v1.5"
+VERSION = "v1.6"
 
 # ── Auto-updater config ───────────────────────────────────────────────────────
 # Set these to your GitHub repo's raw file URLs after first publish.
@@ -1354,7 +1358,7 @@ T = {
     "text_accent":     "#FFFFFF",   # white — logo mark, highlights (was gold)
     # ── interactive ─────────────────────────────────────────────
     "radio_bg":        "#E8E8E8",
-    "radio_select":    "#0D0D0D",   # black selection dot (was gold)
+    "radio_select":    "#FFFFFF",   # white selection dot — visible against dark indicator ring
     "entry_hl":        "#0D0D0D",   # black highlight border (was gold)
     "entry_hl_bg":     "#C0C0C0",
     # ── buttons ─────────────────────────────────────────────────

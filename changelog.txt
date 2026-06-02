@@ -1,4 +1,1 @@
-- Monochrome (black/white/grey) colour palette applied throughout wizard and spreadsheet
-- Spreadsheet title block redesigned: tall mega-header (row 1) with large NEPM badge logo and job name — sheet label now shown via tab only
-- Wizard logo enlarged to 80px filling the header band to the rule line
-- All navy/gold colours replaced with near-black, dark grey, medium grey, and white
+- Fixed: selected radio button option now shows a visible white dot — was invisible against the dark ring in v1.5
