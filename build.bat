@@ -50,23 +50,51 @@ if exist "dist\NEPM_Takeoff_Wizard.exe" del /f /q "dist\NEPM_Takeoff_Wizard.exe"
 if exist "build" rmdir /s /q "build"
 if exist "NEPM_Takeoff_Wizard.spec" del /f /q "NEPM_Takeoff_Wizard.spec"
 
+:: ── Locate python312.dll (must be bundled explicitly on some installs) ────────
+set PYDLL=
+for /f "tokens=*" %%a in ('%PYTHON% -c "import sys,os; print(os.path.join(sys.prefix,\"python312.dll\"))"') do set PYDLL=%%a
+if not exist "%PYDLL%" (
+    echo  WARNING: python312.dll not found at %PYDLL% — build may still succeed.
+    set PYDLL=
+)
+if defined PYDLL echo  Bundling DLL: %PYDLL%
+echo.
+
 :: ── Build ────────────────────────────────────────────────────────────────────
 echo  Building exe — this takes about 30 seconds...
 echo.
-%PYTHON% -m PyInstaller ^
-    --onefile ^
-    --windowed ^
-    --name "NEPM_Takeoff_Wizard" ^
-    --hidden-import openpyxl ^
-    --hidden-import openpyxl.styles ^
-    --hidden-import openpyxl.utils ^
-    --hidden-import openpyxl.worksheet.datavalidation ^
-    --hidden-import PIL ^
-    --hidden-import PIL.Image ^
-    --hidden-import PIL.ImageTk ^
-    --collect-all tkinter ^
-    --collect-all PIL ^
-    %SCRIPT%
+if defined PYDLL (
+    %PYTHON% -m PyInstaller ^
+        --onefile ^
+        --windowed ^
+        --name "NEPM_Takeoff_Wizard" ^
+        --add-binary "%PYDLL%;." ^
+        --hidden-import openpyxl ^
+        --hidden-import openpyxl.styles ^
+        --hidden-import openpyxl.utils ^
+        --hidden-import openpyxl.worksheet.datavalidation ^
+        --hidden-import PIL ^
+        --hidden-import PIL.Image ^
+        --hidden-import PIL.ImageTk ^
+        --collect-all tkinter ^
+        --collect-all PIL ^
+        %SCRIPT%
+) else (
+    %PYTHON% -m PyInstaller ^
+        --onefile ^
+        --windowed ^
+        --name "NEPM_Takeoff_Wizard" ^
+        --hidden-import openpyxl ^
+        --hidden-import openpyxl.styles ^
+        --hidden-import openpyxl.utils ^
+        --hidden-import openpyxl.worksheet.datavalidation ^
+        --hidden-import PIL ^
+        --hidden-import PIL.Image ^
+        --hidden-import PIL.ImageTk ^
+        --collect-all tkinter ^
+        --collect-all PIL ^
+        %SCRIPT%
+)
 
 if not exist "dist\NEPM_Takeoff_Wizard.exe" (
     echo.
