@@ -1,1 +1,1 @@
-- Spreadsheet logo enlarged to match preferred size (5.21 cm × 5.21 cm) — fills the header row properly
+- Fixed: auto-updated exe now launches correctly — Windows no longer blocks the update after download

@@ -1,8 +1,13 @@
 """
-NEPM Takeoff Wizard  v1.7
+NEPM Takeoff Wizard  v1.8
 ==================
 Double-click to run. Requires Python 3.8+ with openpyxl and Pillow.
 If missing, run:  pip install openpyxl pillow
+
+Changes in v1.8:
+  - Fixed: auto-updated exe now runs correctly on Windows
+    (Windows Mark of the Web stripped after download via Unblock-File,
+    preventing PyInstaller DLL extraction from being blocked by Defender)
 
 Changes in v1.7:
   - Spreadsheet logo enlarged to 5.21 cm × 5.21 cm to fill the header row
@@ -78,7 +83,7 @@ except ImportError:
 # ══════════════════════════════════════════════════════════════════════════════
 #  VERSION & USER LOOKUP
 # ══════════════════════════════════════════════════════════════════════════════
-VERSION = "v1.7"
+VERSION = "v1.8"
 
 # ── Auto-updater config ───────────────────────────────────────────────────────
 # Set these to your GitHub repo's raw file URLs after first publish.
@@ -294,6 +299,9 @@ def check_for_updates():
             "@echo off\n"
             "timeout /t 2 /nobreak > nul\n"
             f'move /y "{new_exe_path}" "{exe_path}"\n'
+            # Strip Mark of the Web so PyInstaller can extract DLLs without
+            # Windows Defender blocking the temp folder contents.
+            f'powershell -Command "Unblock-File -LiteralPath \\"{exe_path}\\""\n'
             f'start "" "{exe_path}"\n'
             "del \"%~f0\"\n"
         )
