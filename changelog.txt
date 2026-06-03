@@ -1,1 +1,4 @@
-- Fixed: auto-updated exe now launches correctly — Windows no longer blocks the update after download
+- Rates & Assumptions sheet: title block and date/prepared by bar now correctly fill all columns
+- Notes column in the Rates section now spans the full sheet width
+- Notes column in the Key Assumptions section now spans the full sheet width
+- Logo now sits in column A only across all sheets — job name uses the remaining width
