@@ -1,4 +1,4 @@
-- Rates & Assumptions sheet: title block and date/prepared by bar now correctly fill all columns
-- Notes column in the Rates section now spans the full sheet width
-- Notes column in the Key Assumptions section now spans the full sheet width
-- Logo now sits in column A only across all sheets — job name uses the remaining width
+- Brickwork wizard page: "Double Brick?" option added per brick type — same pattern as Corefill? in blockwork
+- Brickwork sheet: new "Dbl?" column (Y/N, auto-filled from wizard setting, editable per row) and "Total LM" column that doubles the raw LM when Dbl?=Y
+- Brickwork sheet: new "Ht Ref" column next to Height for referencing drawing sources (e.g. TD_302)
+- George Summary: updated to pull from the correct brickwork columns

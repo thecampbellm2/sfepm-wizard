@@ -1,8 +1,16 @@
 """
-NEPM Takeoff Wizard  v2.0
+NEPM Takeoff Wizard  v2.1
 ==================
 Double-click to run. Requires Python 3.8+ with openpyxl and Pillow.
 If missing, run:  pip install openpyxl pillow
+
+Changes in v2.1:
+  - Brickwork wizard page: "Double Brick?" option added per brick type
+    (pre-fills Dbl? column in sheet, still editable per row)
+  - Brickwork sheet: new "Dbl?" column and "Total LM" formula column
+    (doubles raw LM when Dbl?=Y — no more manual =2*x)
+  - Brickwork sheet: new "Ht Ref" column next to Height
+  - George Summary: updated to match new brickwork column layout
 
 Changes in v2.0:
   - Rates & Assumptions sheet: title block now fills correctly across all columns
@@ -97,7 +105,7 @@ except ImportError:
 # ══════════════════════════════════════════════════════════════════════════════
 #  VERSION & USER LOOKUP
 # ══════════════════════════════════════════════════════════════════════════════
-VERSION = "v2.0"
+VERSION = "v2.1"
 
 # ── Auto-updater config ───────────────────────────────────────────────────────
 # Set these to your GitHub repo's raw file URLs after first publish.
@@ -504,33 +512,35 @@ DATA_ROWS  = 50
 RATES_SHEET = "Rates & Assumptions"
 
 
-def build_brickwork(wb, job_name, brick_types, brick_rates_rows):
+def build_brickwork(wb, job_name, brick_types, brick_rates_rows, brick_data=None):
     """
     brick_rates_rows: list of Excel row numbers on the Rates sheet
                       where each brick type's bricks-per-m2 calc lives (col D)
-    Columns (14 total):
-      1=Desc  2=BrickType  3=LM  4=Height  5=M2  6=Ded  7=OpenCount
-      8=OpenWidth  9=TotM2  10=#Brk  11=Wastage  12=Rate  13=Total  14=Notes
+    Columns (17 total):
+      1=Desc  2=BrickType  3=LM  4=Dbl?  5=TotalLM  6=Height  7=HtRef
+      8=M2  9=Ded  10=OpenCount  11=OpenWidth  12=TotM2  13=#Brk
+      14=Wastage  15=Rate  16=Total  17=Notes
     """
     ws = wb.create_sheet("Brickwork")
     ws.sheet_properties.tabColor = C_AMBER
     ws.freeze_panes = "A7"
 
-    n_cols = 14
+    n_cols = 17
     title_block(ws, job_name, "BRICKWORK TAKEOFF", n_cols)
-    set_col_widths(ws, [30, 28, 7, 9, 8, 13, 10, 12, 10, 12, 12, 10, 12, 22])
+    set_col_widths(ws, [30, 28, 7, 6, 9, 9, 14, 8, 13, 10, 12, 10, 10, 10, 10, 12, 22])
 
-    HEADERS = ["Description", "Brick Type", "LM", "Height\n(m)",
-               "M2", "Deductions\nM2", "Opening\nCount", "Opening Width\n(LM)",
+    HEADERS = ["Description", "Brick Type", "LM", "Dbl?", "Total\nLM",
+               "Height\n(m)", "Ht Ref", "M2", "Deductions\nM2",
+               "Opening\nCount", "Opening Width\n(LM)",
                "Total M2", "No. of\nBricks", "Wastage\n(+3%)",
                "Rate\n($ / brick)", "Total ($)", "Notes"]
     ws.row_dimensions[6].height = 46
     for ci, h in enumerate(HEADERS, 1):
-        bg = C_AMBER if ci in (7, 8) else C_DARK_BLUE
+        bg = C_AMBER if ci in (10, 11) else C_DARK_BLUE
         hdr_cell(ws, 6, ci, h, bg=bg)
 
     if brick_types:
-        brick_ref = write_brick_list(wb, brick_types)
+        brick_ref = write_brick_list(wb, brick_types, brick_data=brick_data)
         dv = DataValidation(type="list", formula1=brick_ref, allow_blank=True,
                             showErrorMessage=False)
     else:
@@ -539,45 +549,65 @@ def build_brickwork(wb, job_name, brick_types, brick_rates_rows):
     ws.add_data_validation(dv)
     dv.sqref = f"B{DATA_START}:B{DATA_START+DATA_ROWS-1}"
 
+    n_types = len(brick_types)
+    dbl_lookup = (f"'_ListsBrickwork'!$A$1:$B${n_types}" if n_types > 0 else None)
+    dv_dbl = DataValidation(type="list", formula1='"Y","N"', allow_blank=True,
+                            showErrorMessage=False)
+    ws.add_data_validation(dv_dbl)
+    dv_dbl.sqref = f"D{DATA_START}:D{DATA_START+DATA_ROWS-1}"
+
     for r in range(DATA_START, DATA_START + DATA_ROWS):
         bg = row_bg(r); rs = str(r)
 
-        data_cell(ws, r,  1, bg=bg)                       # Description
-        data_cell(ws, r,  2, bg=bg)                       # Brick Type
-        data_cell(ws, r,  3, bg=bg, fmt="0.00")           # LM
-        data_cell(ws, r,  4, bg=bg, fmt="0.00")           # Height
+        data_cell(ws, r,  1, bg=bg)                       # A Description
+        data_cell(ws, r,  2, bg=bg)                       # B Brick Type
+        data_cell(ws, r,  3, bg=bg, fmt="0.00")           # C LM (raw)
 
-        # M2 = LM × Height
+        # D Dbl? — formula pre-fills from _ListsBrickwork; type Y/N to override
+        c = ws.cell(r, 4)
+        c.fill = fill(C_YELLOW); c.border = xborder()
+        c.alignment = align(h="center"); c.font = xfont()
+        if dbl_lookup:
+            c.value = f'=IF(B{rs}="","",IFERROR(VLOOKUP(B{rs},{dbl_lookup},2,0),""))'
+
+        # E Total LM — doubles when Dbl?=Y
         c = data_cell(ws, r, 5, bg=C_LIGHT_BLUE, fmt="0.00")
-        c.value = f'=IF(OR(C{rs}="",D{rs}=""),"",C{rs}*D{rs})'
+        c.value = f'=IF(C{rs}="","",IF(D{rs}="Y",C{rs}*2,C{rs}))'
 
-        data_cell(ws, r,  6, bg=bg, fmt="0.00")           # Deductions M2
-        data_cell(ws, r,  7, bg=bg, fmt="#,##0")          # Opening Count (NEW)
-        data_cell(ws, r,  8, bg=bg, fmt="0.00")           # Opening Width LM (NEW)
+        data_cell(ws, r,  6, bg=bg, fmt="0.00")           # F Height (m)
+        data_cell(ws, r,  7, bg=bg)                       # G Ht Ref
 
-        # Total M2 = M2 – Deductions
-        c = data_cell(ws, r, 9, bg=C_LIGHT_BLUE, fmt="0.00")
-        c.value = f'=IF(E{rs}="","",E{rs}-F{rs})'
+        # H M2 = Total LM × Height
+        c = data_cell(ws, r, 8, bg=C_LIGHT_BLUE, fmt="0.00")
+        c.value = f'=IF(OR(E{rs}="",F{rs}=""),"",E{rs}*F{rs})'
 
-        # No. of Bricks — looks up bricks/m2 from Rates sheet via MATCH on brick type
-        c = data_cell(ws, r, 10, bg=C_LIGHT_BLUE, fmt="#,##0")
+        data_cell(ws, r,  9, bg=bg, fmt="0.00")           # I Deductions M2
+        data_cell(ws, r, 10, bg=bg, fmt="#,##0")          # J Opening Count
+        data_cell(ws, r, 11, bg=bg, fmt="0.00")           # K Opening Width LM
+
+        # L Total M2 = M2 – Deductions
+        c = data_cell(ws, r, 12, bg=C_LIGHT_BLUE, fmt="0.00")
+        c.value = f'=IF(H{rs}="","",H{rs}-I{rs})'
+
+        # M No. of Bricks
+        c = data_cell(ws, r, 13, bg=C_LIGHT_BLUE, fmt="#,##0")
         c.value = (
-            f'=IF(OR(I{rs}="",B{rs}=""),"",ROUND(I{rs}*'
+            f'=IF(OR(L{rs}="",B{rs}=""),"",ROUND(L{rs}*'
             f'IFERROR(INDEX(\'{RATES_SHEET}\'!$E$3:$E$200,'
             f'MATCH(B{rs},\'{RATES_SHEET}\'!$A$3:$A$200,0)),50),0))'
         )
 
-        # Wastage +3%
-        c = data_cell(ws, r, 11, bg=C_LIGHT_BLUE, fmt="#,##0")
-        c.value = f'=IF(J{rs}="","",ROUND(J{rs}*1.03,0))'
+        # N Wastage +3%
+        c = data_cell(ws, r, 14, bg=C_LIGHT_BLUE, fmt="#,##0")
+        c.value = f'=IF(M{rs}="","",ROUND(M{rs}*1.03,0))'
 
-        data_cell(ws, r, 12, bg=bg, fmt="$#,##0.0000")   # Rate ($ per brick)
+        data_cell(ws, r, 15, bg=bg, fmt="$#,##0.0000")   # O Rate
 
-        # Total = Wastage qty × Rate per brick
-        c = data_cell(ws, r, 13, bg=C_LIGHT_BLUE, fmt="$#,##0.00")
-        c.value = f'=IF(K{rs}="","",K{rs}*L{rs})'
+        # P Total
+        c = data_cell(ws, r, 16, bg=C_LIGHT_BLUE, fmt="$#,##0.00")
+        c.value = f'=IF(N{rs}="","",N{rs}*O{rs})'
 
-        data_cell(ws, r, 14, bg=bg)                       # Notes
+        data_cell(ws, r, 17, bg=bg)                       # Q Notes
         ws.row_dimensions[r].height = 18
 
     T = DATA_START + DATA_ROWS
@@ -587,8 +617,8 @@ def build_brickwork(wb, job_name, brick_types, brick_rates_rows):
     c = ws.cell(T, 1, "TOTAL")
     c.font = xfont(bold=True, c=C_WHITE, sz=11)
     c.alignment = align(h="right")
-    for col, fmt in {7: "#,##0", 8: "0.00", 9: "0.00",
-                     10: "#,##0", 11: "#,##0", 13: "$#,##0.00"}.items():
+    for col, fmt in {10: "#,##0", 11: "0.00", 12: "0.00",
+                     13: "#,##0", 14: "#,##0", 16: "$#,##0.00"}.items():
         cl = get_column_letter(col)
         c = ws.cell(T, col, f"=SUM({cl}{DATA_START}:{cl}{T-1})")
         c.font = xfont(bold=True, c=C_WHITE)
@@ -831,11 +861,16 @@ def get_hidden_sheet(wb, name):
     return ws
 
 
-def write_brick_list(wb, brick_types):
-    """Write brick types to _ListsBrickwork col A. Returns range ref."""
+def write_brick_list(wb, brick_types, brick_data=None):
+    """Write brick types to _ListsBrickwork.
+    Col A = type name. Col B = "Y" if double brick, else ""."""
     ws = get_hidden_sheet(wb, "_ListsBrickwork")
     for i, v in enumerate(brick_types, 1):
         ws.cell(i, 1, str(v))
+        if brick_data and i - 1 < len(brick_data):
+            row = brick_data[i - 1]
+            dbl = row[1] if len(row) > 1 else ""
+            ws.cell(i, 2, "Y" if dbl in ("Yes", "Y") else "")
     return f"'_ListsBrickwork'!$A$1:$A${len(brick_types)}"
 
 
@@ -895,15 +930,15 @@ def build_george_summary(wb, job_name, scope, brick_types, block_types):
             ws.cell(r, 1).fill = fill(row_bg(r))
             ws.cell(r, 1).font = xfont()
             ws.cell(r, 1).alignment = align(h="left")
-            # Brickwork cols after v1.2: I=TotM2(9), J=Bricks(10), K=Wastage(11)
-            #                            G=OpenCount(7), H=OpenWidth(8)
-            ws.cell(r, 2).value = f'=IFERROR(SUMIF(Brickwork!B{DS}:B{DE},A{r},Brickwork!I{DS}:I{DE}),0)'
-            ws.cell(r, 3).value = f'=IFERROR(SUMIF(Brickwork!B{DS}:B{DE},A{r},Brickwork!J{DS}:J{DE}),0)'
-            ws.cell(r, 4).value = f'=IFERROR(SUMIF(Brickwork!B{DS}:B{DE},A{r},Brickwork!K{DS}:K{DE}),0)'
+            # Brickwork cols v2.1: L=TotM2(12), M=Bricks(13), N=Wastage(14)
+            #                      J=OpenCount(10), K=OpenWidth(11)
+            ws.cell(r, 2).value = f'=IFERROR(SUMIF(Brickwork!B{DS}:B{DE},A{r},Brickwork!L{DS}:L{DE}),0)'
+            ws.cell(r, 3).value = f'=IFERROR(SUMIF(Brickwork!B{DS}:B{DE},A{r},Brickwork!M{DS}:M{DE}),0)'
+            ws.cell(r, 4).value = f'=IFERROR(SUMIF(Brickwork!B{DS}:B{DE},A{r},Brickwork!N{DS}:N{DE}),0)'
             ws.cell(r, 6).value = f'=IF(E{r}="","",D{r}*E{r})'
             # Opening totals (cols 8 and 9 in Brickwork = G and H)
-            ws.cell(r, 8).value = f'=IFERROR(SUMIF(Brickwork!B{DS}:B{DE},A{r},Brickwork!G{DS}:G{DE}),0)'
-            ws.cell(r, 9).value = f'=IFERROR(SUMIF(Brickwork!B{DS}:B{DE},A{r},Brickwork!H{DS}:H{DE}),0)'
+            ws.cell(r, 8).value = f'=IFERROR(SUMIF(Brickwork!B{DS}:B{DE},A{r},Brickwork!J{DS}:J{DE}),0)'
+            ws.cell(r, 9).value = f'=IFERROR(SUMIF(Brickwork!B{DS}:B{DE},A{r},Brickwork!K{DS}:K{DE}),0)'
             fmts = {2:"0.00", 3:"#,##0", 4:"#,##0", 6:"$#,##0.00", 8:"#,##0", 9:"0.00"}
             for col, fmt in fmts.items():
                 c = ws.cell(r, col)
@@ -1302,6 +1337,7 @@ def build_excel(config):
     scope        = config.get("scope", "")
     job_name     = config["job_name"]
     brick_types  = config.get("brick_types", [])
+    brick_data   = config.get("brick_data",  [])
     block_types  = config.get("block_types", [])
     save_folder  = config.get("save_folder",
                               os.path.join(os.path.expanduser("~"), "Downloads"))
@@ -1325,7 +1361,8 @@ def build_excel(config):
             block_data = [(t, "", "") for t in block_types]
 
         if scope in ("brickwork", "both"):
-            build_brickwork(wb, job_name, brick_types, brick_rates_rows)
+            build_brickwork(wb, job_name, brick_types, brick_rates_rows,
+                            brick_data=brick_data)
         if scope in ("blockwork", "both"):
             build_blockwork(wb, job_name, block_data, block_rates_rows)
         build_george_summary(wb, job_name, scope, brick_types,
@@ -1808,45 +1845,87 @@ class StepBrickTypes(BaseStep):
     TITLE    = "What brick types are on this job?"
     SUBTITLE = ("Up to 20 types — include size and finish in one field "
                 "(e.g. '230mm Standard Brick - Painted'). "
-                "These become your dropdowns and flow into the George Summary. "
-                "Dimensions can be refined on the Rates sheet after creation.")
+                "Mark 'Double Brick?' for any type measured as both skins — "
+                "the sheet will automatically double the LM for those rows.")
 
-    PLACEHOLDERS = [
-        "e.g. 230mm Standard Brick",
-        "e.g. 230mm Standard Brick - Painted",
-        "e.g. 230mm Recycled Brick",
-        "e.g. Brick Veneer",
-        "e.g. Double Skin Brick",
-        "e.g. 50mm Brick",
-        "e.g. 50mm Brick - Painted",
-        "e.g. Face Brick",
-        "e.g. Engineer Brick",
-        "e.g. Clinker Brick",
-        "e.g. 230mm Standard Brick - Bagged",
-        "e.g. 230mm Standard Brick - Rendered",
-        "e.g. 110mm Brick",
-        "e.g. Glazed Brick",
-        "e.g. Perforated Brick",
-        "e.g. Split Face Brick",
-        "e.g. Pressed Brick",
-        "e.g. Handmade Brick",
-        "e.g. Limestone Block",
-        "e.g. Custom Brick Type",
+    N_TYPES = 20
+    PNAMES  = [
+        "e.g. 230mm Standard Brick",         "e.g. 230mm Standard Brick - Painted",
+        "e.g. 230mm Recycled Brick",         "e.g. Brick Veneer",
+        "e.g. Double Skin Brick",            "e.g. 50mm Brick",
+        "e.g. 50mm Brick - Painted",         "e.g. Face Brick",
+        "e.g. Engineer Brick",               "e.g. Clinker Brick",
+        "e.g. 230mm Standard Brick - Bagged","e.g. 230mm Standard Brick - Rendered",
+        "e.g. 110mm Brick",                  "e.g. Glazed Brick",
+        "e.g. Perforated Brick",             "e.g. Split Face Brick",
+        "e.g. Pressed Brick",                "e.g. Handmade Brick",
+        "e.g. Limestone Block",              "e.g. Custom Brick Type",
     ]
 
     def _build_body(self):
-        existing = self.config_data.get("brick_types", [])
-        # hint above the scrollable grid
-        tk.Label(self, text="Leave blank to skip — only filled entries appear in dropdowns.",
-                 font=("Arial", 9), fg=self.theme["text_muted"],
-                 bg=self.theme["content_bg"], wraplength=580, justify="left"
-                 ).pack(padx=30, pady=(0, 6), anchor="w")
-        container = tk.Frame(self, bg=self.theme["content_bg"])
-        container.pack(padx=30, fill="both", expand=True)
-        self.entries = self._type_entry_grid(container, existing, self.PLACEHOLDERS)
+        t = self.theme
+        existing_data = self.config_data.get("brick_data", [])
+
+        tk.Label(self,
+                 text="Leave blank to skip. Mark Double Brick? for types where both skins are measured together — LM doubles automatically in the sheet.",
+                 font=("Arial", 9), fg=t["text_muted"], bg=t["content_bg"],
+                 wraplength=600, justify="left"
+                 ).pack(padx=24, pady=(0, 4), anchor="w")
+
+        hdr_row = tk.Frame(self, bg=t["bg_mid"])
+        hdr_row.pack(padx=24, fill="x", pady=(0, 2))
+        tk.Label(hdr_row, text="#",    width=3, font=("Arial", 8, "bold"),
+                 fg=t["text_light"], bg=t["bg_mid"], anchor="e").pack(side="left", padx=(4,4))
+        tk.Label(hdr_row, text="Brick Type Name", font=("Arial", 8, "bold"),
+                 fg=t["text_light"], bg=t["bg_mid"], anchor="w").pack(side="left", fill="x", expand=True)
+        tk.Label(hdr_row, text="Double Brick?", width=11, font=("Arial", 8, "bold"),
+                 fg=t["text_light"], bg=t["bg_mid"], anchor="c").pack(side="left", padx=(4,4))
+
+        canvas = tk.Canvas(self, bg=t["content_bg"], highlightthickness=0, height=400)
+        sb = tk.Scrollbar(self, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=sb.set)
+        sb.pack(side="right", fill="y", padx=(0,4))
+        canvas.pack(padx=(24,0), fill="both", expand=True)
+
+        inner = tk.Frame(canvas, bg=t["content_bg"])
+        wid = canvas.create_window((0,0), window=inner, anchor="nw")
+        canvas.bind("<Configure>", lambda e: canvas.itemconfig(wid, width=e.width))
+        inner.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.bind_all("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
+
+        self.brick_rows = []   # (name_entry, dbl_var, placeholder)
+
+        for i in range(self.N_TYPES):
+            ex_name = existing_data[i][0] if i < len(existing_data) else ""
+            ex_dbl  = existing_data[i][1] if i < len(existing_data) else ""
+            ph = self.PNAMES[i] if i < len(self.PNAMES) else f"Brick type {i+1}"
+
+            row = tk.Frame(inner, bg=t["content_bg"])
+            row.pack(fill="x", pady=2, padx=2)
+
+            tk.Label(row, text=f"{i+1}.", width=3, font=("Arial", 9),
+                     fg=t["subtitle_fg"], bg=t["content_bg"], anchor="e").pack(side="left", padx=(0,4))
+
+            e = self._make_entry(row, font_size=10)
+            e.pack(side="left", fill="x", expand=True, ipady=4)
+            if ex_name:
+                e.insert(0, ex_name); e.config(fg=t["text_dark"])
+            else:
+                self._add_placeholder(e, ph)
+
+            dbl_var = tk.StringVar(value=ex_dbl)
+            dbl_om  = tk.OptionMenu(row, dbl_var, "", "Yes", "No")
+            dbl_om.config(width=5, font=("Arial", 9),
+                          bg=t["bg_mid"], fg=t["text_light"],
+                          activebackground=t["sep"], relief="flat",
+                          highlightthickness=0)
+            dbl_om["menu"].config(bg=t["bg_mid"], fg=t["text_light"], font=("Arial", 9))
+            dbl_om.pack(side="left", padx=(6,0))
+
+            self.brick_rows.append((e, dbl_var, ph))
 
     def validate(self):
-        vals = [e.get().strip() for e, ph in self.entries
+        vals = [e.get().strip() for e, dv, ph in self.brick_rows
                 if e.get().strip() not in ("", ph)]
         if not vals:
             messagebox.showwarning("No brick types entered",
@@ -1855,10 +1934,14 @@ class StepBrickTypes(BaseStep):
         return True
 
     def collect(self, config):
-        config["brick_types"] = [
-            e.get().strip() for e, ph in self.entries
-            if e.get().strip() not in ("", ph)
-        ]
+        brick_data, brick_types = [], []
+        for e, dbl_var, ph in self.brick_rows:
+            name = e.get().strip()
+            if name and name not in ("", ph):
+                brick_data.append((name, dbl_var.get()))
+                brick_types.append(name)
+        config["brick_data"]  = brick_data
+        config["brick_types"] = brick_types
 
 
 # ══════════════════════════════════════════════════════════════════════════════
