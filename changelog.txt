@@ -1,4 +1,1 @@
-- Brickwork wizard page: "Double Brick?" option added per brick type — same pattern as Corefill? in blockwork
-- Brickwork sheet: new "Dbl?" column (Y/N, auto-filled from wizard setting, editable per row) and "Total LM" column that doubles the raw LM when Dbl?=Y
-- Brickwork sheet: new "Ht Ref" column next to Height for referencing drawing sources (e.g. TD_302)
-- George Summary: updated to pull from the correct brickwork columns
+- Blockwork sheet: "Ht Ref" column added after Height, matching the brickwork layout

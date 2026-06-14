@@ -1,8 +1,16 @@
 """
-NEPM Takeoff Wizard  v2.1
+NEPM Takeoff Wizard  v2.3
 ==================
 Double-click to run. Requires Python 3.8+ with openpyxl and Pillow.
 If missing, run:  pip install openpyxl pillow
+
+Changes in v2.3:
+  - Blockwork sheet: "Ht Ref" column added after Height (same as brickwork)
+  - George Summary: blockwork column references updated to match new layout
+
+Changes in v2.2:
+  - Fixed: data validation formula1 format corrected for Dbl? dropdown
+    (was producing invalid XML that Excel stripped on open)
 
 Changes in v2.1:
   - Brickwork wizard page: "Double Brick?" option added per brick type
@@ -105,7 +113,7 @@ except ImportError:
 # ══════════════════════════════════════════════════════════════════════════════
 #  VERSION & USER LOOKUP
 # ══════════════════════════════════════════════════════════════════════════════
-VERSION = "v2.1"
+VERSION = "v2.3"
 
 # ── Auto-updater config ───────────────────────────────────────────────────────
 # Set these to your GitHub repo's raw file URLs after first publish.
@@ -551,7 +559,7 @@ def build_brickwork(wb, job_name, brick_types, brick_rates_rows, brick_data=None
 
     n_types = len(brick_types)
     dbl_lookup = (f"'_ListsBrickwork'!$A$1:$B${n_types}" if n_types > 0 else None)
-    dv_dbl = DataValidation(type="list", formula1='"Y","N"', allow_blank=True,
+    dv_dbl = DataValidation(type="list", formula1='"Y,N"', allow_blank=True,
                             showErrorMessage=False)
     ws.add_data_validation(dv_dbl)
     dv_dbl.sqref = f"D{DATA_START}:D{DATA_START+DATA_ROWS-1}"
@@ -633,23 +641,23 @@ def build_brickwork(wb, job_name, brick_types, brick_rates_rows, brick_data=None
 def build_blockwork(wb, job_name, block_data, block_rates_rows):
     """
     block_data: list of (name, size, corefill) tuples from wizard.
-    Columns (20 total):
-      1=Desc 2=BlkType 3=Size 4=LM 5=Ht 6=M2 7=Ded
-      8=OpenCount 9=OpenWidth 10=TotM2 11=#Blk 12=Wast
-      13=CF? 14=CorefM3 15=Steel 16=SBar 17=Cap 18=Rate 19=Total 20=Notes
+    Columns (21 total):
+      1=Desc 2=BlkType 3=Size 4=LM 5=Ht 6=HtRef 7=M2 8=Ded
+      9=OpenCount 10=OpenWidth 11=TotM2 12=#Blk 13=Wast
+      14=CF? 15=CorefM3 16=Steel 17=SBar 18=Cap 19=Rate 20=Total 21=Notes
     """
     block_types = [d[0] for d in block_data]
     ws = wb.create_sheet("Blockwork")
     ws.sheet_properties.tabColor = C_DARK_BLUE
     ws.freeze_panes = "A7"
 
-    n_cols = 20
+    n_cols = 21
     title_block(ws, job_name, "BLOCKWORK TAKEOFF", n_cols)
-    set_col_widths(ws, [26, 26, 10, 6, 9, 8, 13, 10, 12, 10, 10, 10,
+    set_col_widths(ws, [26, 26, 10, 6, 9, 14, 8, 13, 10, 12, 10, 10, 10,
                         11, 10, 10, 10, 14, 11, 12, 22])
 
     HEADERS = ["Description", "Block Type", "Block\nSize",
-               "LM", "Height\n(m)", "M2", "Deductions\nM2",
+               "LM", "Height\n(m)", "Ht Ref", "M2", "Deductions\nM2",
                "Opening\nCount", "Opening Width\n(LM)",
                "Total M2", "No. of\nBlocks", "Wastage\n(+3%)",
                "Corefilled?\n(Yes / No)", "M3\nCorefill",
@@ -657,9 +665,9 @@ def build_blockwork(wb, job_name, block_data, block_rates_rows):
                "Rate\n($ / block)", "Total ($)", "Notes"]
     ws.row_dimensions[6].height = 52
     for ci, h in enumerate(HEADERS, 1):
-        if ci in (8, 9):
+        if ci in (9, 10):
             bg = C_AMBER
-        elif ci == 13:
+        elif ci == 14:
             bg = C_MID_BLUE
         else:
             bg = C_DARK_BLUE
@@ -682,75 +690,76 @@ def build_blockwork(wb, job_name, block_data, block_rates_rows):
     ws.add_data_validation(dv_cf)
     dv_blk.sqref = f"B{DATA_START}:B{DATA_START+DATA_ROWS-1}"
     dv_sz.sqref  = f"C{DATA_START}:C{DATA_START+DATA_ROWS-1}"
-    dv_cf.sqref  = f"M{DATA_START}:M{DATA_START+DATA_ROWS-1}"
+    dv_cf.sqref  = f"N{DATA_START}:N{DATA_START+DATA_ROWS-1}"
 
     for r in range(DATA_START, DATA_START + DATA_ROWS):
         bg = row_bg(r); rs = str(r)
 
-        data_cell(ws, r,  1, bg=bg)                      # Description
-        data_cell(ws, r,  2, bg=bg)                      # Block Type
+        data_cell(ws, r,  1, bg=bg)                      # A Description
+        data_cell(ws, r,  2, bg=bg)                      # B Block Type
 
-        # Col 3: Block Size — auto-populated via VLOOKUP; manually overrideable
+        # C Block Size — auto-populated via VLOOKUP; manually overrideable
         c = data_cell(ws, r, 3, bg=C_LIGHT_BLUE)
         c.value = f'=IFERROR(VLOOKUP(B{rs},\'_ListsBlockwork\'!$A:$B,2,0),"")'
         c.alignment = align(h="center", wrap=False)
 
-        data_cell(ws, r,  4, bg=bg, fmt="0.00")          # LM
-        data_cell(ws, r,  5, bg=bg, fmt="0.00")          # Height
+        data_cell(ws, r,  4, bg=bg, fmt="0.00")          # D LM
+        data_cell(ws, r,  5, bg=bg, fmt="0.00")          # E Height
+        data_cell(ws, r,  6, bg=bg)                      # F Ht Ref (NEW)
 
-        # M2 = LM × Height
-        c = data_cell(ws, r, 6, bg=C_LIGHT_BLUE, fmt="0.00")
+        # G M2 = LM × Height
+        c = data_cell(ws, r, 7, bg=C_LIGHT_BLUE, fmt="0.00")
         c.value = f'=IF(OR(D{rs}="",E{rs}=""),"",D{rs}*E{rs})'
 
-        data_cell(ws, r,  7, bg=bg, fmt="0.00")          # Deductions M2
-        data_cell(ws, r,  8, bg=bg, fmt="#,##0")         # Opening Count (NEW)
-        data_cell(ws, r,  9, bg=bg, fmt="0.00")          # Opening Width LM (NEW)
+        data_cell(ws, r,  8, bg=bg, fmt="0.00")          # H Deductions M2
+        data_cell(ws, r,  9, bg=bg, fmt="#,##0")         # I Opening Count
+        data_cell(ws, r, 10, bg=bg, fmt="0.00")          # J Opening Width LM
 
-        # Total M2 = M2 – Deductions
-        c = data_cell(ws, r, 10, bg=C_LIGHT_BLUE, fmt="0.00")
-        c.value = f'=IF(F{rs}="","",F{rs}-G{rs})'
+        # K Total M2 = M2 – Deductions
+        c = data_cell(ws, r, 11, bg=C_LIGHT_BLUE, fmt="0.00")
+        c.value = f'=IF(G{rs}="","",G{rs}-H{rs})'
 
-        # No. of Blocks
-        c = data_cell(ws, r, 11, bg=C_LIGHT_BLUE, fmt="#,##0")
-        c.value = f'=IF(J{rs}="","",ROUND(J{rs}*12.5,0))'
-
-        # Wastage +3%
+        # L No. of Blocks
         c = data_cell(ws, r, 12, bg=C_LIGHT_BLUE, fmt="#,##0")
-        c.value = f'=IF(K{rs}="","",ROUND(K{rs}*1.03,0))'
+        c.value = f'=IF(K{rs}="","",ROUND(K{rs}*12.5,0))'
 
-        # Corefilled? — auto-populated from wizard; manually overrideable
-        c = data_cell(ws, r, 13, bg=C_LIGHT_BLUE)
+        # M Wastage +3%
+        c = data_cell(ws, r, 13, bg=C_LIGHT_BLUE, fmt="#,##0")
+        c.value = f'=IF(L{rs}="","",ROUND(L{rs}*1.03,0))'
+
+        # N Corefilled? — auto-populated from wizard; manually overrideable
+        c = data_cell(ws, r, 14, bg=C_LIGHT_BLUE)
         c.value = f'=IFERROR(VLOOKUP(B{rs},\'_ListsBlockwork\'!$A:$C,3,0),"")'
         c.alignment = align(h="center", wrap=False)
 
-        # M3 Corefill (references col 13=M for Corefilled, col 11=K for blocks)
-        c = data_cell(ws, r, 14, bg=C_LIGHT_BLUE, fmt="0.00")
+        # O M3 Corefill (col 14=N for Corefilled?, col 12=L for blocks)
+        c = data_cell(ws, r, 15, bg=C_LIGHT_BLUE, fmt="0.00")
         c.value = (
-            f'=IF(M{rs}<>"Yes","",'
-            f'IF(C{rs}="290mm",ROUND(K{rs}/80,2),'
-            f'IF(C{rs}="190mm",ROUND(K{rs}/110,2),'
-            f'IF(C{rs}="140mm",ROUND(K{rs}/130,2),"N/A (90mm)"))))'
+            f'=IF(N{rs}<>"Yes","",'
+            f'IF(C{rs}="290mm",ROUND(L{rs}/80,2),'
+            f'IF(C{rs}="190mm",ROUND(L{rs}/110,2),'
+            f'IF(C{rs}="140mm",ROUND(L{rs}/130,2),"N/A (90mm)"))))'
         )
 
-        # Steel: 10 kg/m² corefilled (references col 13=M, col 10=J for Total M2)
-        c = data_cell(ws, r, 15, bg=C_LIGHT_BLUE, fmt="#,##0.0")
-        c.value = f'=IF(M{rs}<>"Yes","",IF(C{rs}="90mm","N/A",ROUND(J{rs}*10,1)))'
+        # P Steel: 10 kg/m² corefilled (col 14=N, col 11=K for Total M2)
+        c = data_cell(ws, r, 16, bg=C_LIGHT_BLUE, fmt="#,##0.0")
+        c.value = f'=IF(N{rs}<>"Yes","",IF(C{rs}="90mm","N/A",ROUND(K{rs}*10,1)))'
 
-        # Starter bars: 2.5 per LM
-        c = data_cell(ws, r, 16, bg=C_LIGHT_BLUE, fmt="#,##0")
+        # Q Starter bars: 2.5 per LM
+        c = data_cell(ws, r, 17, bg=C_LIGHT_BLUE, fmt="#,##0")
         c.value = f'=IF(D{rs}="","",ROUND(D{rs}*2.5,0))'
 
-        # Capping blocks: 2.5 per LM
-        c = data_cell(ws, r, 17, bg=C_LIGHT_BLUE, fmt="#,##0.0")
+        # R Capping blocks: 2.5 per LM
+        c = data_cell(ws, r, 18, bg=C_LIGHT_BLUE, fmt="#,##0.0")
         c.value = f'=IF(D{rs}="","",ROUND(D{rs}*2.5,1))'
 
-        data_cell(ws, r, 18, bg=bg, fmt="$#,##0.0000")  # Rate ($ per block)
+        data_cell(ws, r, 19, bg=bg, fmt="$#,##0.0000")  # S Rate ($ per block)
 
-        # Total = Wastage qty × Rate per block (col 12=L, col 18=R)
-        c = data_cell(ws, r, 19, bg=C_LIGHT_BLUE, fmt="$#,##0.00")
-        c.value = f'=IF(L{rs}="","",L{rs}*R{rs})'
+        # T Total = Wastage qty × Rate per block (col 13=M, col 19=S)
+        c = data_cell(ws, r, 20, bg=C_LIGHT_BLUE, fmt="$#,##0.00")
+        c.value = f'=IF(M{rs}="","",M{rs}*S{rs})'
 
-        data_cell(ws, r, 20, bg=bg)                      # Notes
+        data_cell(ws, r, 21, bg=bg)                      # U Notes
         ws.row_dimensions[r].height = 18
 
     T = DATA_START + DATA_ROWS
@@ -760,9 +769,9 @@ def build_blockwork(wb, job_name, block_data, block_rates_rows):
     c = ws.cell(T, 1, "TOTAL")
     c.font = xfont(bold=True, c=C_WHITE, sz=11)
     c.alignment = align(h="right")
-    sums = {8: "#,##0", 9: "0.00", 10: "0.00", 11: "#,##0", 12: "#,##0",
-            14: "0.00", 15: "#,##0.0", 16: "#,##0",
-            17: "#,##0.0", 19: "$#,##0.00"}
+    sums = {9: "#,##0", 10: "0.00", 11: "0.00", 12: "#,##0", 13: "#,##0",
+            15: "0.00", 16: "#,##0.0", 17: "#,##0",
+            18: "#,##0.0", 20: "$#,##0.00"}
     for col, fmt in sums.items():
         cl = get_column_letter(col)
         c = ws.cell(T, col, f"=SUM({cl}{DATA_START}:{cl}{T-1})")
@@ -1003,20 +1012,20 @@ def build_george_summary(wb, job_name, scope, brick_types, block_types):
             ws.cell(r, 1).fill = fill(row_bg(r))
             ws.cell(r, 1).font = xfont()
             ws.cell(r, 1).alignment = align(h="left")
-            # Blockwork cols after v1.2:
-            # J=TotM2(10), K=Blocks(11), L=Wastage(12),
-            # N=CorefM3(14), O=Steel(15), P=StarterBars(16)
-            # H=OpenCount(8), I=OpenWidth(9)
-            ws.cell(r, 2).value = f'=IFERROR(SUMIF(Blockwork!B{DS}:B{DE},A{r},Blockwork!J{DS}:J{DE}),0)'
-            ws.cell(r, 3).value = f'=IFERROR(SUMIF(Blockwork!B{DS}:B{DE},A{r},Blockwork!K{DS}:K{DE}),0)'
-            ws.cell(r, 4).value = f'=IFERROR(SUMIF(Blockwork!B{DS}:B{DE},A{r},Blockwork!L{DS}:L{DE}),0)'
-            ws.cell(r, 5).value = f'=IFERROR(SUMIF(Blockwork!B{DS}:B{DE},A{r},Blockwork!N{DS}:N{DE}),0)'
-            ws.cell(r, 6).value = f'=IFERROR(SUMIF(Blockwork!B{DS}:B{DE},A{r},Blockwork!O{DS}:O{DE}),0)'
-            ws.cell(r, 7).value = f'=IFERROR(SUMIF(Blockwork!B{DS}:B{DE},A{r},Blockwork!P{DS}:P{DE}),0)'
+            # Blockwork cols v2.3:
+            # K=TotM2(11), L=Blocks(12), M=Wastage(13),
+            # O=CorefM3(15), P=Steel(16), Q=StarterBars(17)
+            # I=OpenCount(9), J=OpenWidth(10)
+            ws.cell(r, 2).value = f'=IFERROR(SUMIF(Blockwork!B{DS}:B{DE},A{r},Blockwork!K{DS}:K{DE}),0)'
+            ws.cell(r, 3).value = f'=IFERROR(SUMIF(Blockwork!B{DS}:B{DE},A{r},Blockwork!L{DS}:L{DE}),0)'
+            ws.cell(r, 4).value = f'=IFERROR(SUMIF(Blockwork!B{DS}:B{DE},A{r},Blockwork!M{DS}:M{DE}),0)'
+            ws.cell(r, 5).value = f'=IFERROR(SUMIF(Blockwork!B{DS}:B{DE},A{r},Blockwork!O{DS}:O{DE}),0)'
+            ws.cell(r, 6).value = f'=IFERROR(SUMIF(Blockwork!B{DS}:B{DE},A{r},Blockwork!P{DS}:P{DE}),0)'
+            ws.cell(r, 7).value = f'=IFERROR(SUMIF(Blockwork!B{DS}:B{DE},A{r},Blockwork!Q{DS}:Q{DE}),0)'
             ws.cell(r, 9).value = f'=IF(H{r}="","",D{r}*H{r})'
             # Opening totals (cols 8=H and 9=I in Blockwork)
-            ws.cell(r, 11).value = f'=IFERROR(SUMIF(Blockwork!B{DS}:B{DE},A{r},Blockwork!H{DS}:H{DE}),0)'
-            ws.cell(r, 12).value = f'=IFERROR(SUMIF(Blockwork!B{DS}:B{DE},A{r},Blockwork!I{DS}:I{DE}),0)'
+            ws.cell(r, 11).value = f'=IFERROR(SUMIF(Blockwork!B{DS}:B{DE},A{r},Blockwork!I{DS}:I{DE}),0)'
+            ws.cell(r, 12).value = f'=IFERROR(SUMIF(Blockwork!B{DS}:B{DE},A{r},Blockwork!J{DS}:J{DE}),0)'
             fmts = {2:"0.00", 3:"#,##0", 4:"#,##0", 5:"0.00",
                     6:"#,##0.0", 7:"#,##0", 9:"$#,##0.00", 11:"#,##0", 12:"0.00"}
             for col, fmt in fmts.items():
