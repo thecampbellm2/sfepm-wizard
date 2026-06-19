@@ -1,1 +1,3 @@
-- Blockwork sheet: "Ht Ref" column added after Height, matching the brickwork layout
+- Fixed: removed Windows Defender exclusion commands from build.bat and the auto-updater
+- Other antivirus products (Kaspersky etc.) were flagging and quarantining these scripts for modifying a security product's settings
+- Unblock-File and the relaunch pause already resolve the original DLL issue without touching any AV settings

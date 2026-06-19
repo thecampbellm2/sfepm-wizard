@@ -1,8 +1,27 @@
 """
-NEPM Takeoff Wizard  v2.3
+NEPM Takeoff Wizard  v2.6
 ==================
 Double-click to run. Requires Python 3.8+ with openpyxl and Pillow.
 If missing, run:  pip install openpyxl pillow
+
+Changes in v2.6:
+  - Fixed: removed Add-MpPreference (Defender exclusion) calls from
+    build.bat and the auto-updater. Other antivirus products (e.g.
+    Kaspersky) flag scripts that modify a security product's exclusion
+    list as suspicious and quarantine/delete them. Unblock-File plus
+    the 4s relaunch pause already solve the underlying DLL issue
+    without touching any AV settings.
+
+Changes in v2.5:
+  - Fixed: Dbl? column no longer shows "0" for non-double-skin brick types
+    (VLOOKUP returning empty cell was being coerced to 0 by Excel;
+    formula now wraps result in ="Y" check — only "Y" or blank possible)
+  - NEPM badge now used as wizard window/taskbar icon (title bar + taskbar)
+
+Changes in v2.4:
+  - Fixed: auto-updated exe now launches reliably on first run after update
+    (Defender exclusion added for exe directory + 4s pause before relaunch,
+    giving Defender time to finish scanning before PyInstaller extracts DLLs)
 
 Changes in v2.3:
   - Blockwork sheet: "Ht Ref" column added after Height (same as brickwork)
@@ -113,7 +132,7 @@ except ImportError:
 # ══════════════════════════════════════════════════════════════════════════════
 #  VERSION & USER LOOKUP
 # ══════════════════════════════════════════════════════════════════════════════
-VERSION = "v2.3"
+VERSION = "v2.6"
 
 # ── Auto-updater config ───────────────────────────────────────────────────────
 # Set these to your GitHub repo's raw file URLs after first publish.
@@ -329,9 +348,15 @@ def check_for_updates():
             "@echo off\n"
             "timeout /t 2 /nobreak > nul\n"
             f'move /y "{new_exe_path}" "{exe_path}"\n'
-            # Strip Mark of the Web so PyInstaller can extract DLLs without
-            # Windows Defender blocking the temp folder contents.
-            f'powershell -Command "Unblock-File -LiteralPath \\"{exe_path}\\""\n'
+            # Remove Mark of the Web (internet zone flag) — a benign NTFS
+            # attribute change, not a security-product setting, so it
+            # doesn't trigger third-party AV heuristics the way modifying
+            # a Defender exclusion list does.
+            f'powershell -Command "Unblock-File -LiteralPath \\"{exe_path}\\"" 2>nul\n'
+            # Pause to let any real-time AV scan settle before launch.
+            # Without this the DLL extraction to the MEI temp folder can
+            # fail on first run even after Unblock-File.
+            "timeout /t 4 /nobreak > nul\n"
             f'start "" "{exe_path}"\n'
             "del \"%~f0\"\n"
         )
@@ -576,7 +601,7 @@ def build_brickwork(wb, job_name, brick_types, brick_rates_rows, brick_data=None
         c.fill = fill(C_YELLOW); c.border = xborder()
         c.alignment = align(h="center"); c.font = xfont()
         if dbl_lookup:
-            c.value = f'=IF(B{rs}="","",IFERROR(VLOOKUP(B{rs},{dbl_lookup},2,0),""))'
+            c.value = f'=IF(B{rs}="","",IF(IFERROR(VLOOKUP(B{rs},{dbl_lookup},2,0),"")="Y","Y",""))'
 
         # E Total LM — doubles when Dbl?=Y
         c = data_cell(ws, r, 5, bg=C_LIGHT_BLUE, fmt="0.00")
@@ -1503,11 +1528,14 @@ class WizardApp(tk.Tk):
             from PIL import Image as _PILImage, ImageTk as _ImageTk
             import io as _io
             _raw = base64.b64decode(LOGO_B64)
-            _pil = _PILImage.open(_io.BytesIO(_raw)).resize((80, 80), _PILImage.LANCZOS)
-            self._logo_img = _ImageTk.PhotoImage(_pil)
+            _pil = _PILImage.open(_io.BytesIO(_raw))
+            self._logo_img = _ImageTk.PhotoImage(_pil.resize((80, 80), _PILImage.LANCZOS))
             tk.Label(self.hdr_frame, image=self._logo_img,
                      bg=t["bg_dark"], bd=0
                      ).pack(side="left", padx=(16, 14), pady=4)
+            # Window icon (title bar + taskbar)
+            self._icon_img = _ImageTk.PhotoImage(_pil.resize((64, 64), _PILImage.LANCZOS))
+            self.iconphoto(True, self._icon_img)
         except Exception:
             logo_box = tk.Frame(self.hdr_frame, bg=t["bg_mid"], width=80, height=80)
             logo_box.pack(side="left", padx=(16, 14), pady=4)

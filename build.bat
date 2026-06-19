@@ -50,14 +50,32 @@ if exist "dist\NEPM_Takeoff_Wizard.exe" del /f /q "dist\NEPM_Takeoff_Wizard.exe"
 if exist "build" rmdir /s /q "build"
 if exist "NEPM_Takeoff_Wizard.spec" del /f /q "NEPM_Takeoff_Wizard.spec"
 
-:: ── Locate python312.dll (must be bundled explicitly on some installs) ────────
-set PYDLL=
-for /f "tokens=*" %%a in ('%PYTHON% -c "import sys,os; print(os.path.join(sys.prefix,\"python312.dll\"))"') do set PYDLL=%%a
-if not exist "%PYDLL%" (
-    echo  WARNING: python312.dll not found at %PYDLL% — build may still succeed.
-    set PYDLL=
+:: ── Generate icon from logo PNG ──────────────────────────────────────────────
+set ICON_ARG=
+if exist "nepm-badge-transparent.png" (
+    echo  Generating icon from logo...
+    %PYTHON% -c "from PIL import Image; img=Image.open('nepm-badge-transparent.png').resize((256,256)); img.save('nepm-icon.ico')"
+    if exist "nepm-icon.ico" (
+        set "ICON_ARG=--icon nepm-icon.ico"
+        echo  Icon: nepm-icon.ico
+    )
+) else (
+    echo  NOTE: nepm-badge-transparent.png not found in this folder.
+    echo  Place the logo PNG here to include it as the exe icon.
 )
-if defined PYDLL echo  Bundling DLL: %PYDLL%
+echo.
+
+:: ── Locate python312.dll ─────────────────────────────────────────────────────
+set PYPREFIX=
+for /f "tokens=*" %%a in ('%PYTHON% -c "import sys; print(sys.prefix)"') do set PYPREFIX=%%a
+set PYDLL=%PYPREFIX%\python312.dll
+if not exist "%PYDLL%" (
+    echo  WARNING: python312.dll not found at %PYDLL%
+    echo  Build will proceed — PyInstaller will attempt to locate it automatically.
+    set PYDLL=
+) else (
+    echo  DLL located: %PYDLL%
+)
 echo.
 
 :: ── Build ────────────────────────────────────────────────────────────────────
@@ -68,6 +86,7 @@ if defined PYDLL (
         --onefile ^
         --windowed ^
         --name "NEPM_Takeoff_Wizard" ^
+        %ICON_ARG% ^
         --add-binary "%PYDLL%;." ^
         --hidden-import openpyxl ^
         --hidden-import openpyxl.styles ^
@@ -84,6 +103,7 @@ if defined PYDLL (
         --onefile ^
         --windowed ^
         --name "NEPM_Takeoff_Wizard" ^
+        %ICON_ARG% ^
         --hidden-import openpyxl ^
         --hidden-import openpyxl.styles ^
         --hidden-import openpyxl.utils ^
@@ -113,9 +133,6 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0deploy.ps1" -Script "%
 echo.
 echo  ╔══════════════════════════════════════════════════╗
 echo  ║   ALL DONE                                       ║
-echo  ║                                                  ║
-echo  ║   Remember to update changelog.txt before        ║
-echo  ║   the next release                               ║
 echo  ╚══════════════════════════════════════════════════╝
 echo.
 pause
